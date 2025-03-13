@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head runat="server">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Language Translation</title>
+
+    <script>
+        if (window.history.replaceState) {
+            window.history.replaceState(null, null, window.location.href);
+        }
+    </script>
+
+    <style>
+        /* Hide the dropdown menu */
+        #google_translate select {
+            display: none !important;
+        }
+
+        #goog-gt-vt {
+            display: none !important;
+        }
+
+        #targetLanguage {
+            display: none !important;
+        }
+
+        .skiptranslate {
+            display: none !important;
+        }
+
+        /* Hide the Google Translate banner */
+        .goog-te-banner-frame.skiptranslate {
+            display: none !important;
+        }
+
+        /* Hide the "Powered by Google Translate" text */
+        .goog-logo-link {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <form id="form1" runat="server">
+        <div id="google_translate">
+            <!-- Prevent page reload on click -->
+            <button id="englishBtn" type="button" onclick="changeLanguage('en'); return false;">English</button>
+            <button id="hindiBtn" type="button" onclick="changeLanguage('hi'); return false;">Hindi</button>
+        </div>
+
+        <div id="content">
+            <p>
+                English is a very popular language that is spoken all around the world. To communicate effectively in English, it is important to have strong reading comprehension skills...
+                <!-- Your text content here -->
+            </p>
+        </div>
+
+        <script type="text/javascript" src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+
+        <script type="text/javascript">
+            function googleTranslateElementInit() {
+                var googleTranslate = new google.translate.TranslateElement({
+                    pageLanguage: 'en',
+                    includedLanguages: 'en,hi',  // Include both English and Hindi
+                    layout: google.translate.TranslateElement.InlineLayout.HORIZONTAL
+                }, 'google_translate');
+            }
+
+            // Function to change language based on button click
+            function changeLanguage(language) {
+                var selectField = document.querySelector("#google_translate select");
+
+                for (var i = 0; i < selectField.children.length; i++) {
+                    var option = selectField.children[i];
+
+                    if (option.value == language) {
+                        selectField.selectedIndex = i;
+                        selectField.dispatchEvent(new Event('change'));  // Trigger language change
+                        break;
+                    }
+                }
+            }
+        </script>
+    </form>
+</body>
+</html>
