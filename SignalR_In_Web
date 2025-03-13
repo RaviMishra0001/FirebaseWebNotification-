@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head runat="server">
+    <meta charset="utf-8" />
+    <title>Real-Time Chat</title>
+   <script src="Scripts/jquery-3.4.1.min.js"></script>
+    <script src="Scripts/jquery.signalR-2.4.3.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding: 0;
+        }
+
+        .chat-container {
+            display: flex;
+            height: 100vh;
+        }
+
+        .user-list {
+            width: 250px;
+            background-color: #fff;
+            border-right: 1px solid #ddd;
+            padding: 20px;
+        }
+
+        .user-list h3 {
+            margin-top: 0;
+            font-size: 20px;
+            color: #2d3436;
+        }
+
+        .user-list ul {
+            list-style: none;
+            padding: 0;
+            margin-top: 20px;
+        }
+
+        .user-list ul li {
+            padding: 12px;
+            background-color: #f1f1f1;
+            margin: 5px 0;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        .user-list ul li:hover {
+            background-color: #74b9ff;
+        }
+
+        .chat-box {
+            flex-grow: 1;
+            background-color: #fff;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-header {
+            background-color: #3498db;
+            color: white;
+            padding: 10px;
+            font-size: 18px;
+            text-align: center;
+        }
+
+        #messages {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background-color: #ececec;
+        }
+
+        .message {
+            display: inline-block;
+            margin-bottom: 15px;
+            max-width: 60%;
+            padding: 10px;
+            border-radius: 12px;
+            clear: both;
+        }
+
+        .message.sender {
+            background-color: #3498db;
+            color: white;
+            float: right;
+        }
+
+        .message.receiver {
+            background-color: #2ecc71;
+            color: white;
+            float: left;
+        }
+
+        .message-text {
+            word-wrap: break-word;
+        }
+
+        #messageInput {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            margin: 20px 0;
+            font-size: 16px;
+            resize: none;
+            height: 60px;
+            box-sizing: border-box;
+        }
+
+        #sendButton {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            font-size: 16px;
+            border-radius: 20px;
+            cursor: pointer;
+        }
+
+        #sendButton:hover {
+            background-color: #2980b9;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <!-- User List Section -->
+        <div class="user-list">
+            <h3>Online Users</h3>
+            <ul id="userList">
+                <!-- Dynamically populate this list with online users -->
+            </ul>
+            <label for="username">Username:</label>
+            <input type="text" id="username" />
+            <label for="targetUser">Target User:</label>
+            <select id="targetUser">
+                <!-- Dynamically populate this list with online users -->
+            </select>
+        </div>
+
+        <!-- Chat Box Section -->
+        <div class="chat-box">
+            <div class="chat-header">Chat Room</div>
+            <div id="messages"></div>
+            <textarea id="messageInput" placeholder="Type a message..."></textarea>
+            <button type="button" id="sendButton">Send</button>
+        </div>
+    </div>
+
+    <script type="text/javascript">
+        $(function () {
+            // Create the connection to the SignalR hub
+            var connection = $.hubConnection();
+            var chatHub = connection.createHubProxy('chatHub');
+            var username = '';
+
+            // Function to add messages to the chat window
+            chatHub.on('receiveMessage', function (username, message, sender) {
+                var messageClass = sender === 'sender' ? 'sender' : 'receiver';
+                $('#messages').append('<div class="message ' + messageClass + '"><div class="message-text"><strong>' + username + ':</strong> ' + message + '</div></div>');
+                $('#messages').scrollTop($('#messages')[0].scrollHeight); // Auto-scroll to the latest message
+            });
+
+            // Notify when a user joins
+            chatHub.on('userJoined', function (username) {
+                $('#messages').append('<div><em>' + username + ' has joined.</em></div>');
+            });
+
+            // Notify when a user leaves
+            chatHub.on('userLeft', function (username) {
+                $('#messages').append('<div><em>' + username + ' has left.</em></div>');
+            });
+
+            // Update the list of online users
+            chatHub.on('updateUserList', function (users) {
+                $('#userList').empty();
+                $('#targetUser').empty(); // Clear target user dropdown
+
+                users.forEach(function (user) {
+                    $('#userList').append('<li>' + user + '</li>');
+                    $('#targetUser').append('<option value="' + user + '">' + user + '</option>');
+                });
+            });
+
+            // Start the connection to SignalR
+            connection.start().done(function () {
+                username = prompt("Enter your username:");
+                chatHub.invoke('UserJoined', username); // Notify that the user joined
+
+                // Send message on button click
+                $('#sendButton').click(function () {
+                    var targetUser = $('#targetUser').val(); // Get selected target user
+                    var message = $('#messageInput').val();
+
+                    if (message.trim() !== '' && targetUser) {
+                        chatHub.invoke('SendMessageToUser', targetUser, username, message); // Send message to the specific user
+                        chatHub.invoke('SendMessageToUser', username, targetUser, message); // Send the same message to the sender
+                        $('#messageInput').val(''); // Clear the input field after sending
+                    }
+                });
+            }).fail(function (error) {
+                console.error("SignalR connection failed:", error);
+            });
+
+            // Ensure the user is notified when they leave
+            window.onbeforeunload = function () {
+                chatHub.invoke('UserLeft', username);
+            };
+        });
+    </script>
+</body>
+</html>
+////////  Create hub connection /////////////
+    public class ChatHub : Hub
+    {
+
+        private static readonly ConcurrentDictionary<string, string> Users = new ConcurrentDictionary<string, string>();
+
+        // When a user joins, notify all clients
+        public void UserJoined(string username)
+        {
+            if (!Users.ContainsKey(username))
+            {
+                Users[username] = Context.ConnectionId;
+                Clients.All.userJoined(username); // Notify all clients that a user joined
+                UpdateOnlineUsers(); // Update the online users list
+            }
+        }
+
+        // Send a message to all users
+        public void SendMessageToAll(string username, string message)
+        {
+            Clients.All.receiveMessage(username, message); // Send message to all connected users
+        }
+
+        // Send a message to a specific user
+        public void SendMessageToUser(string targetUsername, string username, string message)
+        {
+            if (Users.ContainsKey(targetUsername))
+            {
+                var connectionId = Users[targetUsername];
+                Clients.Client(connectionId).receiveMessage(username, message); // Send message to specific user
+            }
+
+            // Check if the target user is online
+            //if (Users.ContainsKey(targetUsername))
+            //{
+            //    var targetConnectionId = Users[targetUsername];
+            //    var senderConnectionId = Context.ConnectionId; // Get the sender's connection ID
+
+            //    // Send the message to the target user
+            //    Clients.Client(targetConnectionId).receiveMessage(username, message);
+
+            //    // Send the message to the sender as well
+            //    Clients.Client(senderConnectionId).receiveMessage(username, message);
+            //}
+            else
+            {
+                Clients.Client(Context.ConnectionId).receiveMessage("System", "The user is offline.");
+            }
+        }
+
+        // When a user leaves, notify all clients
+        public void UserLeft(string username)
+        {
+            if (Users.ContainsKey(username))
+            {
+                Users.TryRemove(username, out _); // Remove user from the dictionary
+                Clients.All.userLeft(username); // Notify all clients that a user left
+                UpdateOnlineUsers(); // Update the online users list
+            }
+        }
+
+        // Update the list of online users
+        private void UpdateOnlineUsers()
+        {
+            Clients.All.updateUserList(Users.Keys); // Send the updated list of online users to all clients
+        }
+
+        // Override to remove the user from the list when they disconnect
+        public override Task OnDisconnected(bool stopCalled)
+        {
+            var username = Users.FirstOrDefault(x => x.Value == Context.ConnectionId).Key;
+            if (!string.IsNullOrEmpty(username))
+            {
+                UserLeft(username); // Remove user if they disconnect
+            }
+            return base.OnDisconnected(stopCalled);
+        }
+}
+///////// Intilize SignalR in  Startup Class /////////////////
+public class Startup
+    {
+        public void Configuration(IAppBuilder app)
+        {
+            app.MapSignalR();
+        }
+
+    }
